@@ -1,0 +1,13 @@
+server:
+  ip: "127.0.0.1"
+  control_port: 65531
+
+service:
+  - ip: "127.0.0.1"
+    port: 22
+    forward_port: 65532
+
+  - ip: "127.0.0.1"
+    port: 80
+    forward_port: 65533
+
