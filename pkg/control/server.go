@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"strings"
@@ -89,6 +90,23 @@ func (c *ControlRecord) Add(clientID, serverID string, server *ForwardServ) {
 	}
 	c.clientServer[clientID] = append(c.clientServer[clientID], serverID)
 	c.serverMap[serverID] = server
+}
+
+func (c *ControlRecord) Del(clientID string) {
+	c.Lock()
+	defer c.Unlock()
+	if serverIDs, ok := c.clientServer[clientID]; ok {
+		for _, serverID := range serverIDs {
+			if server, ok := c.serverMap[serverID]; ok {
+				go func(server io.Closer) {
+					_ = server.Close()
+				}(server)
+				delete(c.serverMap, serverID)
+			}
+		}
+		delete(c.clientServer, clientID)
+	}
+	return
 }
 
 func (c *ControlRecord) Clear() {
@@ -188,6 +206,7 @@ func (c *ControlServ) handleRegister(conn net.Conn, msg *message.Message) {
 		if coreConn, ok := conn.(*core.Conn); ok {
 			coreConn.SetCloseFunc(func() (err error) {
 				c.clientRecord.Del(clientID)
+				c.controlRecord.Del(clientID)
 				return
 			})
 		}
@@ -286,7 +305,7 @@ func (c *ControlServ) handleCreateServer(conn net.Conn, msg *message.Message) {
 		if err != nil {
 			errInfo = err.Error()
 		}
-		msgBytes, _, err = core.EncodeOneMsg(
+		msgBytes, _, _ = core.EncodeOneMsg(
 			msg.ClientID,
 			message.ControlConn,
 			message.CreateForwardServer,
@@ -294,13 +313,9 @@ func (c *ControlServ) handleCreateServer(conn net.Conn, msg *message.Message) {
 			errInfo,
 			msg.Data,
 		)
-		if err != nil {
-			return
-		}
 		for {
-			_, err = conn.Write(msgBytes)
-			if err == nil || strings.Contains(err.Error(), "use of closed network connection") {
-				err = nil
+			_, writeErr := conn.Write(msgBytes)
+			if writeErr == nil || strings.Contains(writeErr.Error(), "use of closed network connection") {
 				break
 			}
 		}
