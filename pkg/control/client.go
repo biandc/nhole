@@ -212,6 +212,28 @@ func (c *ControlClient) handleCreateServer(msg *message.Message) {
 		c.logger.Info("Successfully created forwarding server %s.", msg.Data)
 	default:
 		c.logger.Error("Failed to create forwarding server %s %s !!!", msg.Data, msg.ErrorInfo)
+		// retry
+		time.Sleep(30 * time.Second)
+		msgBytes, msg, err := core.EncodeOneMsg(
+			c.clientID,
+			message.ControlConn,
+			message.CreateForwardServer,
+			0,
+			"",
+			msg.Data,
+		)
+		if err != nil {
+			c.logger.Error(err.Error())
+			return
+		}
+		for {
+			_, err = c.Write(msgBytes)
+			if err == nil || strings.Contains(err.Error(), "use of closed network connection") {
+				err = nil
+				c.logger.Info("createServer send %s", msg.String())
+				break
+			}
+		}
 	}
 }
 
