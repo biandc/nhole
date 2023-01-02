@@ -2,12 +2,11 @@ package main
 
 import (
 	"fmt"
-	"log"
+	ver "github.com/biandc/nhole/pkg/version"
 	"os"
 
 	"github.com/biandc/nhole/client"
 	"github.com/biandc/nhole/pkg/config"
-	ver "github.com/biandc/nhole/pkg/version"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +28,7 @@ var rootCmd = &cobra.Command{
 	Use: NHOLETYPE,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if version {
-			log.Printf("%s version %s .\n", NHOLETYPE, ver.ShowVersion())
+			ver.ShowVersion()
 			return nil
 		}
 		cfg, err := config.UnmarshalClientCfgByFile(cfgFile)

@@ -1,10 +1,12 @@
 package version
 
+import "fmt"
+
 const (
 	VERSION = "0.0.1"
 )
 
 func ShowVersion() (version string) {
-	version = VERSION
+	fmt.Println(VERSION)
 	return
 }
