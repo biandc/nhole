@@ -113,7 +113,7 @@ type Releaser interface {
 
 func ExitClear(r Releaser, exitInfo string) {
 	exitDone := make(chan struct{})
-	signalCh := make(chan os.Signal)
+	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, syscall.SIGHUP, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGKILL, syscall.SIGTERM)
 	go func() {
 		select {
