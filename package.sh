@@ -67,5 +67,12 @@ for os in $os_all; do
         rm -rf ${nhole_path}
     done
 done
-
 cd -
+
+# sha256sums.txt
+#cd ./release/packages
+sha256sum * > ./sha256sums.txt
+
+# windows10 del "*"
+# 86aa8b2b5bae731449cfe853d205f74f79d0c196617542e748a70db6dfd4b4e0 *nhole_0.0.1_windows_amd64.tar.gz
+sed -i "s/*//g" ./sha256sums.txt
