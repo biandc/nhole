@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"time"
 
 	"github.com/biandc/nhole/pkg/config"
 	"github.com/biandc/nhole/pkg/control"
@@ -29,8 +30,18 @@ func Run(cfg *config.ClientCfg) (err error) {
 	if err != nil {
 		return
 	}
+	go func() {
+		for {
+			err := clienter.Init()
+			if err != nil {
+				log.Error(err.Error())
+				time.Sleep(1 * time.Second)
+				continue
+			}
+			clienter.Run()
+		}
+	}()
 	log.Info("nhole-client start ...")
-	clienter.Run()
 	tools.ExitClear(clienter, "nhole-client exit ...")
 	return
 }

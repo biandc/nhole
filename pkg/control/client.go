@@ -33,16 +33,16 @@ type ControlClient struct {
 }
 
 func NewControlClienter(ctx context.Context, ip string, port int) (c *ControlClient, err error) {
-	var conn net.Conn
-	conn, err = core.NewConner(ip, port)
-	if err != nil {
-		return
-	}
-	reader := bufio.NewReader(conn)
-	coreConn := core.NewCoreConner(core.NewReadWriteCloser(reader, conn, nil), conn)
+	//var conn net.Conn
+	//conn, err = core.NewConner(ip, port)
+	//if err != nil {
+	//	return
+	//}
+	//reader := bufio.NewReader(conn)
+	//coreConn := core.NewCoreConner(core.NewReadWriteCloser(reader, conn, nil), conn)
 	//newCtx, cancel := context.WithCancel(ctx)
 	newCtx := ctx
-	msgCh := core.Decode2MsgCh(reader)
+	//msgCh := core.Decode2MsgCh(reader)
 	cfg := ctx.Value("cfg").(*config.ClientCfg)
 	services := make(map[int]ServiceInfo, len(cfg.Services))
 	for _, service := range cfg.Services {
@@ -59,21 +59,37 @@ func NewControlClienter(ctx context.Context, ip string, port int) (c *ControlCli
 		ip:       ip,
 		port:     port,
 		clientID: "",
-		Conn:     coreConn,
-		ctx:      newCtx,
+		//Conn:     coreConn,
+		ctx: newCtx,
 		//cancelFunc: cancel,
-		logger:   log.FromContextSafe(newCtx),
-		msgCh:    msgCh,
+		logger: log.FromContextSafe(newCtx),
+		//msgCh:    msgCh,
 		services: services,
 	}
-	c.logger.AppendPrefix(c.RemoteAddr().String())
+	return
+}
+
+func (c *ControlClient) Init() (err error) {
+	var conn net.Conn
+	conn, err = core.NewConner(c.ip, c.port)
+	if err != nil {
+		return
+	}
+	reader := bufio.NewReader(conn)
+	coreConn := core.NewCoreConner(core.NewReadWriteCloser(reader, conn, nil), conn)
+	msgCh := core.Decode2MsgCh(reader)
+	c.Conn = coreConn
+	c.msgCh = msgCh
+	addr := c.RemoteAddr().String()
+	c.logger.Info("connect to nhole-server %s ...", addr)
+	c.logger.AppendPrefix(addr)
 	return
 }
 
 func (c *ControlClient) Run() {
 	c.register()
 	go c.heartbeat()
-	go c.handleData()
+	c.handleData()
 }
 
 func (c *ControlClient) register() {
@@ -231,6 +247,10 @@ func (c *ControlClient) handleHeartbeat(_ interface{}) {
 }
 
 func (c *ControlClient) handleData() {
+	defer func() {
+		c.logger.Info("Close.")
+		c.clear()
+	}()
 	for msg := range c.msgCh {
 		if (msg.ConnType != message.ControlConn) || // && msg.ConnType != message.ForwardConn) ||
 			(c.clientID != "" && msg.ClientID != c.clientID) {
@@ -260,6 +280,15 @@ func (c *ControlClient) handleData() {
 	}
 }
 
+func (c *ControlClient) clear() {
+	c.clientID = ""
+	c.msgCh = nil
+	c.Conn = nil
+	c.logger.ResetPrefixes()
+}
+
 func (c *ControlClient) Release() {
-	_ = c.Close()
+	if c.Conn != nil {
+		_ = c.Close()
+	}
 }
