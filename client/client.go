@@ -18,6 +18,7 @@ const (
 )
 
 func Run(cfg *config.ClientCfg) (err error) {
+	tools.PrintLogo()
 	log.InitLog(LogWay, LogFile, LogLevel, LogMaxdays, LogDisableColor)
 
 	var (
