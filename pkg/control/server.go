@@ -120,15 +120,19 @@ func (c *ControlRecord) Clear() {
 }
 
 type ControlServ struct {
-	ip            string
-	port          int
+	ip   string
+	port int
+
 	controlRecord *ControlRecord
 	clientRecord  *ClientRecord
+
 	net.Listener
+
 	ctx        context.Context
 	cancelFunc context.CancelFunc
 	logger     *log.Logger
-	connCh     chan net.Conn
+
+	connCh chan net.Conn
 }
 
 func NewControlServer(ctx context.Context, ip string, port int) (c *ControlServ, err error) {
@@ -139,15 +143,19 @@ func NewControlServer(ctx context.Context, ip string, port int) (c *ControlServ,
 	}
 	newCtx, cancel := context.WithCancel(ctx)
 	c = &ControlServ{
-		ip:            ip,
-		port:          port,
+		ip:   ip,
+		port: port,
+
 		controlRecord: NewControlRecord(),
 		clientRecord:  NewClientRecord(),
-		Listener:      listener,
-		ctx:           newCtx,
-		cancelFunc:    cancel,
-		logger:        log.FromContextSafe(newCtx),
-		connCh:        make(chan net.Conn, 100),
+
+		Listener: listener,
+
+		ctx:        newCtx,
+		cancelFunc: cancel,
+		logger:     log.FromContextSafe(newCtx),
+
+		connCh: make(chan net.Conn, 100),
 	}
 	c.logger.AppendPrefix(c.Addr().String())
 	return
@@ -167,7 +175,7 @@ func (c *ControlServ) accept() {
 		default:
 			conn, err := c.Accept()
 			if err != nil {
-				c.logger.Info(err.Error())
+				c.logger.Warn(err.Error())
 				return
 			}
 			c.connCh <- conn
@@ -237,13 +245,7 @@ func (c *ControlServ) createConn(clientID, fserverID, forwardID string) {
 	if err != nil {
 		return
 	}
-	for {
-		_, err = clienter.Write(msgBytes)
-		if err == nil || strings.Contains(err.Error(), "use of closed network connection") {
-			err = nil
-			break
-		}
-	}
+	_, err = clienter.Write(msgBytes)
 }
 
 func (c *ControlServ) handleCreateConn(conn net.Conn, msg *message.Message) {
@@ -301,6 +303,9 @@ func (c *ControlServ) handleCreateServer(conn net.Conn, msg *message.Message) {
 		}
 	}()
 	defer func() {
+		if err != nil {
+			return
+		}
 		errInfo := ""
 		if err != nil {
 			errInfo = err.Error()
@@ -313,12 +318,7 @@ func (c *ControlServ) handleCreateServer(conn net.Conn, msg *message.Message) {
 			errInfo,
 			msg.Data,
 		)
-		for {
-			_, writeErr := conn.Write(msgBytes)
-			if writeErr == nil || strings.Contains(writeErr.Error(), "use of closed network connection") {
-				break
-			}
-		}
+		_, err = conn.Write(msgBytes)
 	}()
 	port, err = strconv.Atoi(msg.Data)
 	if err != nil {
@@ -335,7 +335,6 @@ func (c *ControlServ) handleCreateServer(conn net.Conn, msg *message.Message) {
 		errInt = 3
 	} else {
 		c.controlRecord.Add(msg.ClientID, msg.Data, fserver)
-		//c.controlRecord.Add(msg.ClientID, fserver.serverID, fserver)
 		fserver.Run()
 	}
 }

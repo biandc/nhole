@@ -13,17 +13,22 @@ import (
 )
 
 type ForwardServ struct {
-	ip       string
-	port     int
+	ip   string
+	port int
+
 	clientID string
 	serverID string
+
 	net.Listener
+
 	ctx        context.Context
 	cancelFunc context.CancelFunc
 	logger     *log.Logger
+
 	connCh     chan net.Conn
 	createConn func(clientID, fserverID, forwardID string)
-	record     map[string]net.Conn
+
+	record map[string]net.Conn
 	sync.RWMutex
 }
 
@@ -41,17 +46,22 @@ func NewForwardServer(
 	}
 	newCtx, cancel := context.WithCancel(ctx)
 	f = &ForwardServ{
-		ip:         ip,
-		port:       port,
-		clientID:   clientID,
-		serverID:   serverID,
-		Listener:   listener,
+		ip:   ip,
+		port: port,
+
+		clientID: clientID,
+		serverID: serverID,
+
+		Listener: listener,
+
 		ctx:        newCtx,
 		cancelFunc: cancel,
 		logger:     log.FromContextSafe(ctx),
+
 		connCh:     make(chan net.Conn, 100),
 		createConn: createConn,
-		record:     make(map[string]net.Conn, 0),
+
+		record: make(map[string]net.Conn, 0),
 	}
 	f.logger.AppendPrefix(f.Addr().String())
 	return
@@ -71,7 +81,7 @@ func (f *ForwardServ) accept() {
 		default:
 			conn, err := f.Accept()
 			if err != nil {
-				f.logger.Info(err.Error())
+				f.logger.Warn(err.Error())
 				return
 			}
 			f.connCh <- conn
@@ -82,15 +92,23 @@ func (f *ForwardServ) accept() {
 func (f *ForwardServ) handleConn(conn net.Conn) {
 	addr := conn.RemoteAddr().String()
 	f.logger.Info("Connection from %s", addr)
-	core.NewReadWriteCloser(conn, conn, func() (err error) {
+	coreConn := core.NewCoreConner(core.NewReadWriteCloser(conn, conn, func() (err error) {
 		f.Del(addr)
 		return
-	})
-	f.Add(conn.RemoteAddr().String(), conn)
+	}), conn)
+	f.Add(addr, coreConn)
 	f.createConn(f.clientID, strconv.Itoa(f.port), addr)
 }
 
 func (f *ForwardServ) HandleConn() {
+	defer func() {
+		err := f.Close()
+		if err != nil {
+			f.logger.Warn(err.Error())
+		} else {
+			f.logger.Info("Close.")
+		}
+	}()
 	for conn := range f.connCh {
 		go f.handleConn(conn)
 	}
@@ -123,10 +141,6 @@ func (f *ForwardServ) Del(fID string) {
 }
 
 func (f *ForwardServ) Release() {
-	err := f.Close()
-	if err != nil {
-		f.logger.Warn(err.Error())
-	}
 	f.cancelFunc()
 	// TODO: clear f.record
 	return
@@ -134,12 +148,14 @@ func (f *ForwardServ) Release() {
 
 type ForwardClient struct {
 	clientID    string
+	serverID    string
+	forwardID   string
+
 	localIp     string
 	localPort   int
 	controlIp   string
 	controlPort int
-	serverID    string
-	forwardID   string
+
 	localConn   net.Conn
 	controlConn net.Conn
 }
@@ -175,12 +191,14 @@ func NewForwardClienter(
 	}
 	f = &ForwardClient{
 		clientID:    "",
+		serverID:    serverID,
+		forwardID:   forwardID,
+
 		localIp:     localIp,
 		localPort:   localPort,
 		controlIp:   cIp,
 		controlPort: cPort,
-		serverID:    serverID,
-		forwardID:   forwardID,
+
 		localConn:   localConn,
 		controlConn: controlConn,
 	}

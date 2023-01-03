@@ -21,28 +21,22 @@ type ServiceInfo struct {
 }
 
 type ControlClient struct {
-	ip       string
-	port     int
+	ip   string
+	port int
+
 	clientID string
 	net.Conn
-	ctx context.Context
-	//cancelFunc context.CancelFunc
-	logger   *log.Logger
-	msgCh    chan *message.Message
+
+	ctx    context.Context
+	logger *log.Logger
+
+	msgCh chan *message.Message
+
 	services map[int]ServiceInfo
 }
 
 func NewControlClienter(ctx context.Context, ip string, port int) (c *ControlClient, err error) {
-	//var conn net.Conn
-	//conn, err = core.NewConner(ip, port)
-	//if err != nil {
-	//	return
-	//}
-	//reader := bufio.NewReader(conn)
-	//coreConn := core.NewCoreConner(core.NewReadWriteCloser(reader, conn, nil), conn)
-	//newCtx, cancel := context.WithCancel(ctx)
 	newCtx := ctx
-	//msgCh := core.Decode2MsgCh(reader)
 	cfg := ctx.Value("cfg").(*config.ClientCfg)
 	services := make(map[int]ServiceInfo, len(cfg.Services))
 	for _, service := range cfg.Services {
@@ -56,14 +50,14 @@ func NewControlClienter(ctx context.Context, ip string, port int) (c *ControlCli
 		}
 	}
 	c = &ControlClient{
-		ip:       ip,
-		port:     port,
+		ip:   ip,
+		port: port,
+
 		clientID: "",
-		//Conn:     coreConn,
-		ctx: newCtx,
-		//cancelFunc: cancel,
+
+		ctx:    newCtx,
 		logger: log.FromContextSafe(newCtx),
-		//msgCh:    msgCh,
+
 		services: services,
 	}
 	return
@@ -109,12 +103,9 @@ func (c *ControlClient) register() {
 	if err != nil {
 		return
 	}
-	for {
-		_, err = c.Write(msgBytes)
-		if err == nil || strings.Contains(err.Error(), "use of closed network connection") {
-			err = nil
-			break
-		}
+	_, err = c.Write(msgBytes)
+	if err == nil || strings.Contains(err.Error(), "use of closed network connection") {
+		err = nil
 	}
 }
 
@@ -125,17 +116,12 @@ func (c *ControlClient) handleRegister(msg *message.Message) {
 	c.createServer()
 }
 
-//func (c *ControlClient) createConn() {
-//
-//}
-
 func (c *ControlClient) handleCreateConn(msg *message.Message) {
 	var (
 		data        *message.CreateConnData
 		forwardPort int
 		clienter    *ForwardClient
 		err         error
-		//errInt      = 0
 	)
 	defer func() {
 		if err != nil {
@@ -144,23 +130,18 @@ func (c *ControlClient) handleCreateConn(msg *message.Message) {
 			log.Info("Successfully created forwarding connection %s .", data.ForwardID)
 		}
 	}()
-	//defer func() {
-	//}()
 	switch msg.Error {
 	case 0:
 		data, err = message.UnmarshalCreateConnData(msg.Data)
 		if err != nil {
-			//errInt = 1
 			return
 		}
 		forwardPort, err = strconv.Atoi(data.ServerID)
 		if err != nil {
-			//errInt = 2
 			return
 		}
 		if localConnInfo, ok := c.services[forwardPort]; !ok {
 			err = fmt.Errorf("no local connection information found %d", forwardPort)
-			//errInt = 3
 		} else {
 			clienter, err = NewForwardClienter(
 				localConnInfo.ip,
@@ -171,7 +152,6 @@ func (c *ControlClient) handleCreateConn(msg *message.Message) {
 				data.ForwardID,
 			)
 			if err != nil {
-				//errInt = 4
 				return
 			}
 			clienter.Run()
@@ -195,13 +175,11 @@ func (c *ControlClient) createServer() {
 			c.logger.Error(err.Error())
 			continue
 		}
-		for {
-			_, err = c.Write(msgBytes)
-			if err == nil || strings.Contains(err.Error(), "use of closed network connection") {
-				err = nil
-				c.logger.Info("createServer send %s", msg.String())
-				break
-			}
+		_, err = c.Write(msgBytes)
+		if err != nil {
+			c.logger.Error(err.Error())
+		} else {
+			c.logger.Info("createServer send %s", msg.String())
 		}
 	}
 }
@@ -226,55 +204,30 @@ func (c *ControlClient) handleCreateServer(msg *message.Message) {
 			c.logger.Error(err.Error())
 			return
 		}
-		for {
-			_, err = c.Write(msgBytes)
-			if err == nil || strings.Contains(err.Error(), "use of closed network connection") {
-				err = nil
-				c.logger.Info("createServer send %s", msg.String())
-				break
-			}
+		_, err = c.Write(msgBytes)
+		if err != nil {
+			c.logger.Error(err.Error())
+		} else {
+			c.logger.Info("createServer send %s", msg.String())
 		}
 	}
 }
 
 func (c *ControlClient) heartbeat() {
-	var (
-		msgBytes []byte
-		msg      *message.Message
-		err      error
-	)
-	defer func() {
-		if err != nil {
-			c.logger.Error(err.Error())
-		} else {
-			c.logger.Debug("heartbeat send %s", msg.String())
-		}
-	}()
-	msgBytes, msg, err = core.EncodeOneMsg(c.clientID, message.ControlConn, message.HEARTBEAT, 0, "", "")
-	if err != nil {
-		return
-	}
-	for {
-		_, err = c.Write(msgBytes)
-		if err == nil || strings.Contains(err.Error(), "use of closed network connection") {
-			err = nil
-			break
-		}
-	}
+	// PASS
 }
 
 func (c *ControlClient) handleHeartbeat(_ interface{}) {
-	time.Sleep(10 * time.Second)
-	c.heartbeat()
+	// PASS
 }
 
 func (c *ControlClient) handleData() {
 	defer func() {
-		c.logger.Info("Close.")
+		c.logger.Warn("Close.")
 		c.clear()
 	}()
 	for msg := range c.msgCh {
-		if (msg.ConnType != message.ControlConn) || // && msg.ConnType != message.ForwardConn) ||
+		if (msg.ConnType != message.ControlConn) ||
 			(c.clientID != "" && msg.ClientID != c.clientID) {
 			c.logger.Error("connType error message %s", msg.String())
 			continue
@@ -303,6 +256,7 @@ func (c *ControlClient) handleData() {
 }
 
 func (c *ControlClient) clear() {
+	_ = c.Close()
 	c.clientID = ""
 	c.msgCh = nil
 	c.Conn = nil
@@ -311,6 +265,6 @@ func (c *ControlClient) clear() {
 
 func (c *ControlClient) Release() {
 	if c.Conn != nil {
-		_ = c.Close()
+		c.clear()
 	}
 }
