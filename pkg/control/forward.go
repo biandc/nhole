@@ -21,7 +21,7 @@ type ForwardServ struct {
 
 	net.Listener
 
-	ctx context.Context
+	ctx    context.Context
 	logger *log.Logger
 
 	connCh     chan net.Conn
@@ -53,7 +53,7 @@ func NewForwardServer(
 
 		Listener: listener,
 
-		ctx: newCtx,
+		ctx:    newCtx,
 		logger: log.FromContextSafe(ctx),
 
 		connCh:     make(chan net.Conn, 100),
