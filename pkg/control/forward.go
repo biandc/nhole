@@ -21,9 +21,8 @@ type ForwardServ struct {
 
 	net.Listener
 
-	ctx        context.Context
-	cancelFunc context.CancelFunc
-	logger     *log.Logger
+	ctx context.Context
+	logger *log.Logger
 
 	connCh     chan net.Conn
 	createConn func(clientID, fserverID, forwardID string)
@@ -44,7 +43,7 @@ func NewForwardServer(
 	if err != nil {
 		return
 	}
-	newCtx, cancel := context.WithCancel(ctx)
+	newCtx := ctx
 	f = &ForwardServ{
 		ip:   ip,
 		port: port,
@@ -54,9 +53,8 @@ func NewForwardServer(
 
 		Listener: listener,
 
-		ctx:        newCtx,
-		cancelFunc: cancel,
-		logger:     log.FromContextSafe(ctx),
+		ctx: newCtx,
+		logger: log.FromContextSafe(ctx),
 
 		connCh:     make(chan net.Conn, 100),
 		createConn: createConn,
@@ -75,28 +73,19 @@ func (f *ForwardServ) Run() {
 func (f *ForwardServ) accept() {
 	defer close(f.connCh)
 	for {
-		select {
-		case <-f.ctx.Done():
+		conn, err := f.Accept()
+		if err != nil {
+			f.logger.Warn(err.Error())
 			return
-		default:
-			conn, err := f.Accept()
-			if err != nil {
-				f.logger.Warn(err.Error())
-				return
-			}
-			f.connCh <- conn
 		}
+		f.connCh <- conn
 	}
 }
 
 func (f *ForwardServ) handleConn(conn net.Conn) {
 	addr := conn.RemoteAddr().String()
 	f.logger.Info("Connection from %s", addr)
-	coreConn := core.NewCoreConner(core.NewReadWriteCloser(conn, conn, func() (err error) {
-		f.Del(addr)
-		return
-	}), conn)
-	f.Add(addr, coreConn)
+	f.Add(addr, conn)
 	f.createConn(f.clientID, strconv.Itoa(f.port), addr)
 }
 
@@ -131,25 +120,28 @@ func (f *ForwardServ) Add(fID string, fclient net.Conn) {
 	f.record[fID] = fclient
 }
 
-func (f *ForwardServ) Del(fID string) {
+func (f *ForwardServ) clear() {
 	f.Lock()
 	defer f.Unlock()
-	if fclient, ok := f.record[fID]; ok {
-		_ = fclient.Close()
-		delete(f.record, fID)
+	for _, conn := range f.record {
+		_ = conn.Close()
 	}
+	f.record = nil
 }
 
-func (f *ForwardServ) Release() {
-	f.cancelFunc()
-	// TODO: clear f.record
+func (f *ForwardServ) Close() (err error) {
+	f.clear()
+	err = f.Listener.Close()
+	if err != nil {
+		return
+	}
 	return
 }
 
 type ForwardClient struct {
-	clientID    string
-	serverID    string
-	forwardID   string
+	clientID  string
+	serverID  string
+	forwardID string
 
 	localIp     string
 	localPort   int
@@ -190,9 +182,9 @@ func NewForwardClienter(
 		return
 	}
 	f = &ForwardClient{
-		clientID:    "",
-		serverID:    serverID,
-		forwardID:   forwardID,
+		clientID:  "",
+		serverID:  serverID,
+		forwardID: forwardID,
 
 		localIp:     localIp,
 		localPort:   localPort,

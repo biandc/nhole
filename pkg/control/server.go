@@ -4,10 +4,8 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/biandc/nhole/pkg/core"
@@ -98,25 +96,12 @@ func (c *ControlRecord) Del(clientID string) {
 	if serverIDs, ok := c.clientServer[clientID]; ok {
 		for _, serverID := range serverIDs {
 			if server, ok := c.serverMap[serverID]; ok {
-				go func(server io.Closer) {
-					_ = server.Close()
-				}(server)
+				_ = server.Close()
 				delete(c.serverMap, serverID)
 			}
 		}
 		delete(c.clientServer, clientID)
 	}
-	return
-}
-
-func (c *ControlRecord) Clear() {
-	c.Lock()
-	defer c.Unlock()
-	for _, value := range c.serverMap {
-		value.Release()
-	}
-	c.clientServer = nil
-	c.serverMap = nil
 }
 
 type ControlServ struct {
@@ -128,9 +113,8 @@ type ControlServ struct {
 
 	net.Listener
 
-	ctx        context.Context
-	cancelFunc context.CancelFunc
-	logger     *log.Logger
+	ctx    context.Context
+	logger *log.Logger
 
 	connCh chan net.Conn
 }
@@ -141,7 +125,7 @@ func NewControlServer(ctx context.Context, ip string, port int) (c *ControlServ,
 	if err != nil {
 		return
 	}
-	newCtx, cancel := context.WithCancel(ctx)
+	newCtx := ctx
 	c = &ControlServ{
 		ip:   ip,
 		port: port,
@@ -151,9 +135,8 @@ func NewControlServer(ctx context.Context, ip string, port int) (c *ControlServ,
 
 		Listener: listener,
 
-		ctx:        newCtx,
-		cancelFunc: cancel,
-		logger:     log.FromContextSafe(newCtx),
+		ctx:    newCtx,
+		logger: log.FromContextSafe(newCtx),
 
 		connCh: make(chan net.Conn, 100),
 	}
@@ -169,17 +152,12 @@ func (c *ControlServ) Run() {
 func (c *ControlServ) accept() {
 	defer close(c.connCh)
 	for {
-		select {
-		case <-c.ctx.Done():
+		conn, err := c.Accept()
+		if err != nil {
+			c.logger.Warn(err.Error())
 			return
-		default:
-			conn, err := c.Accept()
-			if err != nil {
-				c.logger.Warn(err.Error())
-				return
-			}
-			c.connCh <- conn
 		}
+		c.connCh <- conn
 	}
 }
 
@@ -202,12 +180,9 @@ func (c *ControlServ) handleRegister(conn net.Conn, msg *message.Message) {
 	if err != nil {
 		return
 	}
-	for {
-		_, err = conn.Write(msgBytes)
-		if err == nil || strings.Contains(err.Error(), "use of closed network connection") {
-			err = nil
-			break
-		}
+	_, err = conn.Write(msgBytes)
+	if err != nil {
+		return
 	}
 	if msg.ConnType == message.ControlConn {
 		c.clientRecord.Add(clientID, conn)
@@ -284,10 +259,6 @@ func (c *ControlServ) handleCreateConn(conn net.Conn, msg *message.Message) {
 }
 
 func (c *ControlServ) handleCreateServer(conn net.Conn, msg *message.Message) {
-	if msg.ConnType != message.ControlConn {
-		log.Error("handleCreateServer msg.ConnType not is %s", message.ControlConn)
-		return
-	}
 	var (
 		port     int
 		fserver  *ForwardServ
@@ -303,9 +274,6 @@ func (c *ControlServ) handleCreateServer(conn net.Conn, msg *message.Message) {
 		}
 	}()
 	defer func() {
-		if err != nil {
-			return
-		}
 		errInfo := ""
 		if err != nil {
 			errInfo = err.Error()
@@ -318,7 +286,10 @@ func (c *ControlServ) handleCreateServer(conn net.Conn, msg *message.Message) {
 			errInfo,
 			msg.Data,
 		)
-		_, err = conn.Write(msgBytes)
+		_, writeErr := conn.Write(msgBytes)
+		if writeErr != nil {
+			err = writeErr
+		}
 	}()
 	port, err = strconv.Atoi(msg.Data)
 	if err != nil {
@@ -386,10 +357,6 @@ controlConn:
 	}()
 	msgCh := core.Decode2MsgCh(reader)
 	for msg := range msgCh {
-		if msg.ConnType != message.ControlConn {
-			c.logger.Error("connType error message from %s %s", conn.RemoteAddr().String(), msg.String())
-			continue
-		}
 		if msg.Operation != message.HEARTBEAT {
 			c.logger.Info("message from %s %s", conn.RemoteAddr().String(), msg.String())
 		}
@@ -424,7 +391,5 @@ func (c *ControlServ) Release() {
 	if err != nil {
 		c.logger.Warn(err.Error())
 	}
-	c.cancelFunc()
-	c.controlRecord.Clear()
 	return
 }
