@@ -30,7 +30,7 @@ server:
 
 ./configfiles/nhole-client.yaml
 
-```yaml
+```
 server:
   ip: "127.0.0.1"   // nhole-server ip
   control_port: 65531 // nhole-server control port
@@ -67,18 +67,31 @@ go run ./cmd/client/main.go
 
 ```bash
 Usage:
-  nhole-server/client [flags]
+  nhole-server [flags]
 
 Flags:
   -c, --cfg_file string     config file path. (default "./nhole-server.yaml")
   -h, --help                help for nhole-server
       --log_disable_color   disable log color.
       --log_file string     log save file.
-      --log_level string    log level.(error|warn|info|debug|trace) (default "info")
+      --log_level string    log level.(error|warn|info|debug|trace) (default "warn")
       --log_maxdays int     maximum number of days to save logs.
       --log_way string      log way.(console|file) (default "console")
   -v, --version             nhole-server version.
+```
+```bash
+Usage:
+  nhole-client [flags]
 
+Flags:
+  -c, --cfg_file string     config file path. (default "./nhole-client.yaml")
+  -h, --help                help for nhole-client
+      --log_disable_color   disable log color.
+      --log_file string     log save file.
+      --log_level string    log level.(error|warn|info|debug|trace) (default "warn")
+      --log_maxdays int     maximum number of days to save logs.
+      --log_way string      log way.(console|file) (default "console")
+  -v, --version             nhole-client version.
 ```
 
 ## compile
