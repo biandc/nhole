@@ -20,16 +20,26 @@ func InitLog(logWay string, logFile string, logLevel string, maxdays int64, disa
 }
 
 func SetLogFile(logWay string, logFile string, maxdays int64, disableLogColor bool) {
-	if logWay == "console" {
-		params := ""
-		if disableLogColor {
-			params = `{"color": false}`
-		}
-		_ = Log.SetLogger("console", params)
-	} else {
-		params := fmt.Sprintf(`{"filename": "%s", "maxdays": %d}`, logFile, maxdays)
+	var params string
+	switch logWay {
+	case "file":
+		// file
+		params = fmt.Sprintf(`{"filename": "%s", "maxdays": %d}`, logFile, maxdays)
 		_ = Log.SetLogger("file", params)
+		return
+	case "console":
+		goto console
+	default:
+		// other
+		Log.Warn("log_way error... set log_way is \"console\".")
+		goto console
 	}
+console:
+	// defaule console
+	if disableLogColor {
+		params = `{"color": false}`
+	}
+	_ = Log.SetLogger("console", params)
 }
 
 func SetLogLevel(logLevel string) {

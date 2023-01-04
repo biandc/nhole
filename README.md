@@ -63,6 +63,24 @@ go run ./cmd/client/main.go
 ./nhole-client -c nhole-client.yaml
 ```
 
+### startup parameter
+
+```bash
+Usage:
+  nhole-server/client [flags]
+
+Flags:
+  -c, --cfg_file string     config file path. (default "./nhole-server.yaml")
+  -h, --help                help for nhole-server
+      --log_disable_color   disable log color.
+      --log_file string     log save file.
+      --log_level string    log level.(error|warn|info|debug|trace) (default "info")
+      --log_maxdays int     maximum number of days to save logs.
+      --log_way string      log way.(console|file) (default "console")
+  -v, --version             nhole-server version.
+
+```
+
 ## compile
 
 ```bash

@@ -9,12 +9,12 @@ import (
 	"github.com/biandc/nhole/pkg/tools"
 )
 
-const (
-	LogWay          = "console"
-	LogFile         = ""
-	LogLevel        = "debug"
-	LogMaxdays      = 0
-	LogDisableColor = false
+var (
+	LogWay          string
+	LogFile         string
+	LogLevel        string
+	LogMaxdays      int64
+	LogDisableColor bool
 )
 
 func Run(cfg *config.ServerCfg) (err error) {
