@@ -30,7 +30,7 @@ server:
 
 ./configfiles/nhole-client.yaml
 
-```
+```yaml
 server:
   ip: "127.0.0.1"   // nhole-server ip
   control_port: 65531 // nhole-server control port
