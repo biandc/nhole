@@ -79,6 +79,7 @@ Flags:
       --log_way string      log way.(console|file) (default "console")
   -v, --version             nhole-server version.
 ```
+
 ```bash
 Usage:
   nhole-client [flags]
@@ -100,3 +101,7 @@ Flags:
 make clean
 make all  # generate files path ./bin
 ```
+
+## Simple Working Diagram
+
+![Simple Working Diagram](./docs/images/nhole%20Simple%20Working%20Diagram.drawio.png)
