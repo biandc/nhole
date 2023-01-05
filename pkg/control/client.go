@@ -75,9 +75,7 @@ func (c *ControlClient) Init() (err error) {
 	reader := bufio.NewReader(conn)
 	coreConn := core.NewCoreConner(core.NewReadWriteCloser(reader, conn, nil), conn)
 	msgCh := core.Decode2MsgCh(reader)
-	c.Lock()
-	c.Conn = coreConn
-	c.Unlock()
+	c.setConn(coreConn)
 	c.msgCh = msgCh
 	addr := c.RemoteAddr().String()
 	c.logger.Info("connect to nhole-server %s ...", addr)
@@ -196,9 +194,7 @@ func (c *ControlClient) handleCreateServer(msg *message.Message) {
 	default:
 		c.logger.Error("Failed to create forwarding server %s %s !!!", msg.Data, msg.ErrorInfo)
 		// retry
-		c.RLock()
-		conn := c.Conn
-		c.RUnlock()
+		conn := c.getConn()
 		if conn == nil {
 			return
 		}
@@ -217,7 +213,7 @@ func (c *ControlClient) handleCreateServer(msg *message.Message) {
 		}
 		_, err = conn.Write(msgBytes)
 		if err != nil {
-			c.logger.Error(err.Error())
+			c.logger.Error("%s  %s", conn.LocalAddr().String(), err.Error())
 		} else {
 			c.logger.Info("createServer send %s", msg.String())
 		}
@@ -266,21 +262,29 @@ func (c *ControlClient) handleData() {
 	}
 }
 
+func (c *ControlClient) getConn() (conn net.Conn) {
+	c.RLock()
+	defer c.RUnlock()
+	conn = c.Conn
+	return
+}
+
+func (c *ControlClient) setConn(conn net.Conn) {
+	c.Lock()
+	defer c.Unlock()
+	c.Conn = conn
+}
+
 func (c *ControlClient) clear() {
 	_ = c.Close()
 	c.clientID = ""
 	c.msgCh = nil
-	c.Lock()
-	c.Conn = nil
-	c.Unlock()
+	c.setConn(nil)
 	c.logger.ResetPrefixes()
 }
 
 func (c *ControlClient) Release() {
-	c.RLock()
-	conn := c.Conn
-	c.RUnlock()
-	if conn != nil {
+	if c.getConn() != nil {
 		c.clear()
 	}
 }
