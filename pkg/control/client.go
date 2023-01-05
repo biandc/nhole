@@ -7,6 +7,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/biandc/nhole/pkg/config"
@@ -33,6 +34,8 @@ type ControlClient struct {
 	msgCh chan *message.Message
 
 	services map[int]ServiceInfo
+
+	sync.RWMutex
 }
 
 func NewControlClienter(ctx context.Context, ip string, port int) (c *ControlClient, err error) {
@@ -72,7 +75,9 @@ func (c *ControlClient) Init() (err error) {
 	reader := bufio.NewReader(conn)
 	coreConn := core.NewCoreConner(core.NewReadWriteCloser(reader, conn, nil), conn)
 	msgCh := core.Decode2MsgCh(reader)
+	c.Lock()
 	c.Conn = coreConn
+	c.Unlock()
 	c.msgCh = msgCh
 	addr := c.RemoteAddr().String()
 	c.logger.Info("connect to nhole-server %s ...", addr)
@@ -191,6 +196,12 @@ func (c *ControlClient) handleCreateServer(msg *message.Message) {
 	default:
 		c.logger.Error("Failed to create forwarding server %s %s !!!", msg.Data, msg.ErrorInfo)
 		// retry
+		c.RLock()
+		conn := c.Conn
+		c.RUnlock()
+		if conn == nil {
+			return
+		}
 		time.Sleep(30 * time.Second)
 		msgBytes, msg, err := core.EncodeOneMsg(
 			c.clientID,
@@ -204,7 +215,7 @@ func (c *ControlClient) handleCreateServer(msg *message.Message) {
 			c.logger.Error(err.Error())
 			return
 		}
-		_, err = c.Write(msgBytes)
+		_, err = conn.Write(msgBytes)
 		if err != nil {
 			c.logger.Error(err.Error())
 		} else {
@@ -259,12 +270,17 @@ func (c *ControlClient) clear() {
 	_ = c.Close()
 	c.clientID = ""
 	c.msgCh = nil
+	c.Lock()
 	c.Conn = nil
+	c.Unlock()
 	c.logger.ResetPrefixes()
 }
 
 func (c *ControlClient) Release() {
-	if c.Conn != nil {
+	c.RLock()
+	conn := c.Conn
+	c.RUnlock()
+	if conn != nil {
 		c.clear()
 	}
 }
