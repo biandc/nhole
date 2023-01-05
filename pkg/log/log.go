@@ -56,8 +56,8 @@ func SetLogLevel(logLevel string) {
 	case "trace":
 		level = 8
 	default:
-		Log.Warn("log_level error... set log_level is \"warn\".")
-		level = 4
+		Log.Warn("log_level error... set log_level is \"info\".")
+		level = 6
 	}
 	Log.SetLevel(level)
 }

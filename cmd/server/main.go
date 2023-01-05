@@ -24,7 +24,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "cfg_file", "c", fmt.Sprintf("./%s.yaml", NHOLETYPE), "config file path.")
 	rootCmd.PersistentFlags().StringVarP(&server.LogWay, "log_way", "", "console", "log way.(console|file)")
 	rootCmd.PersistentFlags().StringVarP(&server.LogFile, "log_file", "", "", "log save file.")
-	rootCmd.PersistentFlags().StringVarP(&server.LogLevel, "log_level", "", "warn", "log level.(error|warn|info|debug|trace)")
+	rootCmd.PersistentFlags().StringVarP(&server.LogLevel, "log_level", "", "info", "log level.(error|warn|info|debug|trace)")
 	rootCmd.PersistentFlags().Int64VarP(&server.LogMaxdays, "log_maxdays", "", 0, "maximum number of days to save logs.")
 	rootCmd.PersistentFlags().BoolVarP(&server.LogDisableColor, "log_disable_color", "", false, "disable log color.")
 }
