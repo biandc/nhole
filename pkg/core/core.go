@@ -181,12 +181,8 @@ func EncodeOneMsg(
 		return
 	}
 	msgBytesLen := len(msgBytes)
-	//buf := tools.GetBuf(msgBytesLen + PackageHeadLen)
-	//defer tools.PutBuf(buf)
 	dataBytes = make([]byte, msgBytesLen+PackageHeadLen)
 	header := tools.Uint322Bytes(msgBytesLen)
-	//copy(buf[:PackageHeadLen], header)
-	//copy(buf[PackageHeadLen:], msgBytes)
 	copy(dataBytes[:PackageHeadLen], header)
 	copy(dataBytes[PackageHeadLen:], msgBytes)
 	return
