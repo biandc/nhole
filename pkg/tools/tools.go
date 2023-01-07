@@ -112,17 +112,17 @@ type Releaser interface {
 }
 
 func ExitClear(r Releaser, exitInfo string) {
-	exitDone := make(chan struct{})
 	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, syscall.SIGHUP, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGKILL, syscall.SIGTERM)
-	go func() {
-		select {
-		case <-signalCh:
-			log.Info(exitInfo)
-			r.Release()
-			exitDone <- struct{}{}
-			close(exitDone)
-		}
-	}()
-	<-exitDone
+	signal.Notify(
+		signalCh,
+		os.Interrupt,
+		//syscall.SIGHUP,
+		syscall.SIGINT,
+		syscall.SIGQUIT,
+		syscall.SIGKILL,
+		syscall.SIGTERM,
+	)
+	_ = <-signalCh
+	log.Info(exitInfo)
+	r.Release()
 }
