@@ -276,15 +276,17 @@ func (c *ControlClient) setConn(conn net.Conn) {
 }
 
 func (c *ControlClient) clear() {
-	_ = c.Close()
-	c.clientID = ""
-	c.msgCh = nil
-	c.setConn(nil)
-	c.logger.ResetPrefixes()
+	c.Lock()
+	defer c.Unlock()
+	if c.Conn != nil {
+		_ = c.Close()
+		c.clientID = ""
+		c.msgCh = nil
+		c.Conn = nil
+		c.logger.ResetPrefixes()
+	}
 }
 
 func (c *ControlClient) Release() {
-	if c.getConn() != nil {
-		c.clear()
-	}
+	c.clear()
 }
