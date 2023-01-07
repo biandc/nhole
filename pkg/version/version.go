@@ -3,7 +3,7 @@ package version
 import "fmt"
 
 const (
-	VERSION = "0.0.5"
+	VERSION = "0.0.6"
 )
 
 func ShowVersion() (version string) {
