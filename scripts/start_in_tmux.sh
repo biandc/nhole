@@ -18,9 +18,9 @@ client() {
     tmux new-session -s nhole-client -n start -d
     tmux send-keys -t nhole-client './nhole-client -c ./nhole-client.yaml --log_way="file" --log_file="./nhole-client.log" --log_level="debug"' C-m
     tmux new-window -n info -t nhole-client
-    tmux send-keys -t nhole-client:2 'tail -f ./nhole-client.log' C-m
-    tmux split-window -v -t nhole-client:2
-    tmux send-keys -t nhole-client:2 'watch "netstat -antp | grep 127.0.0.1 | grep 22"' C-m
+    tmux send-keys -t nhole-client:1 'tail -f ./nhole-client.log' C-m
+    tmux split-window -v -t nhole-client:1
+    tmux send-keys -t nhole-client:1 'watch "netstat -antp | grep 127.0.0.1 | grep 22"' C-m
     return
 }
 
@@ -30,9 +30,9 @@ server() {
     tmux new-session -s nhole-server -n start -d
     tmux send-keys -t nhole-server './nhole-server -c ./nhole-server.yaml --log_way="file" --log_file="./nhole-server.log" --log_level="debug"' C-m
     tmux new-window -n info -t nhole-server
-    tmux send-keys -t nhole-server:2 'tail -f ./nhole-server.log' C-m
-    tmux split-window -v -t nhole-server:2
-    tmux send-keys -t nhole-server:2 'watch "netstat -antp | grep 6553"' C-m
+    tmux send-keys -t nhole-server:1 'tail -f ./nhole-server.log' C-m
+    tmux split-window -v -t nhole-server:1
+    tmux send-keys -t nhole-server:1 'watch "netstat -antp | grep 6553"' C-m
     return
 }
 
