@@ -1,10 +1,12 @@
 package tools
 
-import "fmt"
+import (
+	"github.com/biandc/nhole/pkg/log"
+	"github.com/biandc/nhole/pkg/version"
+)
 
 func PrintLogo() {
-	fmt.Println(`
-███▄▄▄▄      ▄█    █▄     ▄██████▄   ▄█          ▄████████ 
+	logo := `███▄▄▄▄      ▄█    █▄     ▄██████▄   ▄█          ▄████████ 
 ███▀▀▀██▄   ███    ███   ███    ███ ███         ███    ███ 
 ███   ███   ███    ███   ███    ███ ███         ███    █▀  
 ███   ███  ▄███▄▄▄▄███▄▄ ███    ███ ███        ▄███▄▄▄     
@@ -12,5 +14,6 @@ func PrintLogo() {
 ███   ███   ███    ███   ███    ███ ███         ███    █▄  
 ███   ███   ███    ███   ███    ███ ███▌    ▄   ███    ███ 
  ▀█   █▀    ███    █▀     ▀██████▀  █████▄▄██   ██████████ 
-                                    ▀`)
+                                    ▀`
+	log.Info("VERSION: %s\n%s", version.VERSION, logo)
 }
