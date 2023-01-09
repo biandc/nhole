@@ -209,8 +209,12 @@ func (c *Conn) Close() (err error) {
 	return
 }
 
-func (c *Conn) SetReadTimeout(readTimeout time.Duration) {
+func (c *Conn) SetReadTimeout(readTimeout time.Duration) (err error) {
 	c.readTimeout = readTimeout
+	if readTimeout <= 0 {
+		err = c.SetReadDeadline(time.Time{})
+	}
+	return
 }
 
 func (c *Conn) SetCloseFn(closeFn func() (err error)) {

@@ -350,13 +350,13 @@ func (c *ControlServ) handleConn(conn net.Conn) {
 		}
 	}
 forwardConn:
-	conner.SetReadTimeout(0)
 	for {
 		msg, err := core.DecodeOneMsg(conner)
 		if err != nil {
 			return
 		}
 		if msg.Operation == message.CreateForwardConn && msg.ConnType == message.ForwardConn {
+			_ = conner.SetReadTimeout(0)
 			go c.handleCreateConn(conner, msg)
 			return
 		}
