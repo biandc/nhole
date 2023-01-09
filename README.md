@@ -30,7 +30,7 @@ server:
 
 ./configfiles/nhole-client.yaml
 
-```yaml
+```
 server:
   ip: "127.0.0.1"   // nhole-server ip
   control_port: 65531 // nhole-server control port
@@ -104,4 +104,8 @@ make all  # generate files path ./bin
 
 ## Simple Working Diagram
 
-![Simple Working Diagram](./docs/images/nhole%20Simple%20Working%20Diagram.drawio.png)
+### Tcp Forward
+
+![Tcp Forward](./docs/images/Tcp%20Forward%20Working%20Diagram.drawio.png)
+
+### Nat Hole
