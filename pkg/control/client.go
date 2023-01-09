@@ -1,7 +1,6 @@
 package control
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"net"
@@ -72,10 +71,9 @@ func (c *ControlClient) Init() (err error) {
 	if err != nil {
 		return
 	}
-	reader := bufio.NewReader(conn)
-	coreConn := core.NewCoreConner(core.NewReadWriteCloser(reader, conn, nil), conn)
-	msgCh := core.Decode2MsgCh(reader)
-	c.setConn(coreConn)
+	conner := core.WrapConner(conn, 60*time.Second, nil)
+	msgCh := core.Decode2MsgCh(conner)
+	c.setConn(conner)
 	c.msgCh = msgCh
 	addr := c.RemoteAddr().String()
 	c.logger.Info("connect to nhole-server %s ...", addr)
@@ -85,7 +83,6 @@ func (c *ControlClient) Init() (err error) {
 
 func (c *ControlClient) Run() {
 	c.register()
-	go c.heartbeat()
 	c.handleData()
 }
 
@@ -117,6 +114,7 @@ func (c *ControlClient) handleRegister(msg *message.Message) {
 	c.logger.Info("set clientID %s ...", c.clientID)
 	c.logger.AppendPrefix(c.clientID)
 	c.createServer()
+	c.heartbeat()
 }
 
 func (c *ControlClient) handleCreateConn(msg *message.Message) {
@@ -221,11 +219,28 @@ func (c *ControlClient) handleCreateServer(msg *message.Message) {
 }
 
 func (c *ControlClient) heartbeat() {
-	// PASS
+	var (
+		msgBytes []byte
+		err      error
+	)
+	defer func() {
+		if err != nil {
+			c.logger.Error(err.Error())
+		}
+	}()
+	msgBytes, _, err = core.EncodeOneMsg(c.clientID, message.ControlConn, message.HEARTBEAT, 0, "", "")
+	if err != nil {
+		return
+	}
+	_, err = c.Write(msgBytes)
+	if err != nil {
+		return
+	}
 }
 
 func (c *ControlClient) handleHeartbeat(_ interface{}) {
-	// PASS
+	time.Sleep(30 * time.Second)
+	c.heartbeat()
 }
 
 func (c *ControlClient) handleData() {

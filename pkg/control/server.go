@@ -1,12 +1,12 @@
 package control
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"net"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/biandc/nhole/pkg/core"
 	"github.com/biandc/nhole/pkg/log"
@@ -46,8 +46,7 @@ func (c *ClientRecord) Add(clientID string, clienter net.Conn) {
 func (c *ClientRecord) Del(clientID string) {
 	c.Lock()
 	defer c.Unlock()
-	if clienter, ok := c.clientMap[clientID]; ok {
-		_ = clienter.Close()
+	if _, ok := c.clientMap[clientID]; ok {
 		delete(c.clientMap, clientID)
 	}
 }
@@ -161,7 +160,7 @@ func (c *ControlServ) accept() {
 	}
 }
 
-func (c *ControlServ) handleRegister(conn net.Conn, msg *message.Message) {
+func (c *ControlServ) handleRegister(conner net.Conn, msg *message.Message) {
 	var (
 		msgBytes []byte
 		msgRes   *message.Message
@@ -171,7 +170,7 @@ func (c *ControlServ) handleRegister(conn net.Conn, msg *message.Message) {
 		if err != nil {
 			c.logger.Error(err.Error())
 		} else {
-			addr := conn.RemoteAddr().String()
+			addr := conner.RemoteAddr().String()
 			c.logger.Info("register %s %s", addr, msgRes.String())
 		}
 	}()
@@ -180,14 +179,14 @@ func (c *ControlServ) handleRegister(conn net.Conn, msg *message.Message) {
 	if err != nil {
 		return
 	}
-	_, err = conn.Write(msgBytes)
+	_, err = conner.Write(msgBytes)
 	if err != nil {
 		return
 	}
 	if msg.ConnType == message.ControlConn {
-		c.clientRecord.Add(clientID, conn)
-		if coreConn, ok := conn.(*core.Conn); ok {
-			coreConn.SetCloseFunc(func() (err error) {
+		c.clientRecord.Add(clientID, conner)
+		if conner, ok := conner.(*core.Conn); ok {
+			conner.SetCloseFn(func() (err error) {
 				c.clientRecord.Del(clientID)
 				c.controlRecord.Del(clientID)
 				return
@@ -223,7 +222,7 @@ func (c *ControlServ) createConn(clientID, fserverID, forwardID string) {
 	_, err = clienter.Write(msgBytes)
 }
 
-func (c *ControlServ) handleCreateConn(conn net.Conn, msg *message.Message) {
+func (c *ControlServ) handleCreateConn(conner net.Conn, msg *message.Message) {
 	if msg.ConnType != message.ForwardConn {
 		log.Error("handleCreateConn msg.ConnType not is %s", message.ForwardConn)
 		return
@@ -238,7 +237,7 @@ func (c *ControlServ) handleCreateConn(conn net.Conn, msg *message.Message) {
 		if err != nil {
 			c.logger.Error(err.Error())
 		} else {
-			addr := conn.RemoteAddr().String()
+			addr := conner.RemoteAddr().String()
 			addr2 := fclient.RemoteAddr().String()
 			c.logger.Info("forwarding %s %s ...", addr, addr2)
 		}
@@ -255,10 +254,10 @@ func (c *ControlServ) handleCreateConn(conn net.Conn, msg *message.Message) {
 	if err != nil {
 		return
 	}
-	core.Forward(fclient, conn)
+	core.Forward(fclient, conner)
 }
 
-func (c *ControlServ) handleCreateServer(conn net.Conn, msg *message.Message) {
+func (c *ControlServ) handleCreateServer(conner net.Conn, msg *message.Message) {
 	var (
 		port     int
 		fserver  *ForwardServ
@@ -286,7 +285,7 @@ func (c *ControlServ) handleCreateServer(conn net.Conn, msg *message.Message) {
 			errInfo,
 			msg.Data,
 		)
-		_, writeErr := conn.Write(msgBytes)
+		_, writeErr := conner.Write(msgBytes)
 		if writeErr != nil {
 			err = writeErr
 		}
@@ -310,16 +309,31 @@ func (c *ControlServ) handleCreateServer(conn net.Conn, msg *message.Message) {
 	}
 }
 
-func (c *ControlServ) handleHeartbeat(_ interface{}, msg *message.Message) {
-	// PASS
+func (c *ControlServ) handleHeartbeat(conner net.Conn, msg *message.Message) {
+	var (
+		msgBytes []byte
+		err      error
+	)
+	defer func() {
+		if err != nil {
+			c.logger.Error(err.Error())
+		}
+	}()
+	msgBytes, _, err = core.EncodeOneMsg(msg.ClientID, msg.ConnType, msg.Operation, 0, "", "")
+	if err != nil {
+		return
+	}
+	_, err = conner.Write(msgBytes)
+	if err != nil {
+		return
+	}
 }
 
 func (c *ControlServ) handleConn(conn net.Conn) {
 	c.logger.Info("Connection from %s", conn.RemoteAddr().String())
-	reader := bufio.NewReader(conn)
-	coreConn := core.NewCoreConner(core.NewReadWriteCloser(reader, conn, nil), conn)
+	conner := core.WrapConner(conn, 60*time.Second, nil)
 	for {
-		msg, err := core.DecodeOneMsg(coreConn)
+		msg, err := core.DecodeOneMsg(conner)
 		if err != nil {
 			return
 		}
@@ -327,7 +341,7 @@ func (c *ControlServ) handleConn(conn net.Conn) {
 			(msg.ConnType != message.ControlConn && msg.ConnType != message.ForwardConn) {
 			continue
 		}
-		go c.handleRegister(coreConn, msg)
+		go c.handleRegister(conner, msg)
 		switch msg.ConnType {
 		case message.ControlConn:
 			goto controlConn
@@ -337,25 +351,25 @@ func (c *ControlServ) handleConn(conn net.Conn) {
 	}
 forwardConn:
 	for {
-		msg, err := core.DecodeOneMsg(coreConn)
+		msg, err := core.DecodeOneMsg(conner)
 		if err != nil {
 			return
 		}
 		if msg.Operation == message.CreateForwardConn && msg.ConnType == message.ForwardConn {
-			go c.handleCreateConn(coreConn, msg)
+			go c.handleCreateConn(conner, msg)
 			return
 		}
 	}
 controlConn:
 	defer func() {
-		err := coreConn.Close()
+		err := conner.Close()
 		if err != nil {
 			c.logger.Error(err.Error())
 		} else {
-			c.logger.Info("%s Close.", coreConn.RemoteAddr().String())
+			c.logger.Info("%s Close.", conner.RemoteAddr().String())
 		}
 	}()
-	msgCh := core.Decode2MsgCh(reader)
+	msgCh := core.Decode2MsgCh(conner)
 	for msg := range msgCh {
 		if msg.Operation != message.HEARTBEAT {
 			c.logger.Info("message from %s %s", conn.RemoteAddr().String(), msg.String())
@@ -363,16 +377,16 @@ controlConn:
 		switch msg.Operation {
 		case message.REGISTER:
 			// register
-			go c.handleRegister(coreConn, msg)
+			go c.handleRegister(conner, msg)
 		case message.CreateForwardConn:
 			// create forward conn
-			go c.handleCreateConn(coreConn, msg)
+			go c.handleCreateConn(conner, msg)
 		case message.CreateForwardServer:
 			// create forward server
-			go c.handleCreateServer(coreConn, msg)
+			go c.handleCreateServer(conner, msg)
 		case message.HEARTBEAT:
 			// heartbeat
-			go c.handleHeartbeat(coreConn, msg)
+			go c.handleHeartbeat(conner, msg)
 		default:
 			// error
 			c.logger.Warn("error message from %s %s", conn.RemoteAddr().String(), msg.String())

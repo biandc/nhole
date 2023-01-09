@@ -1,12 +1,11 @@
 package core
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"net"
-	"strings"
 	"sync"
+	"time"
 
 	"github.com/biandc/nhole/pkg/core/tcp"
 	"github.com/biandc/nhole/pkg/message"
@@ -23,75 +22,6 @@ func NewListener(ip string, port int) (listener net.Listener, err error) {
 
 func NewConner(ip string, port int) (conn net.Conn, err error) {
 	return tcp.NewConner(ip, port)
-}
-
-type ReadWriteClose struct {
-	reader    io.Reader
-	writer    io.Writer
-	closeFunc func() (err error)
-	closed    bool
-	sync.RWMutex
-}
-
-func NewReadWriteCloser(reader io.Reader, writer io.Writer, closeFunc func() (err error)) (rwc *ReadWriteClose) {
-	rwc = &ReadWriteClose{
-		reader:    reader,
-		writer:    writer,
-		closeFunc: closeFunc,
-		closed:    false,
-	}
-	return
-}
-
-func (rwc *ReadWriteClose) Read(b []byte) (n int, err error) {
-	return rwc.reader.Read(b)
-}
-
-func (rwc *ReadWriteClose) Write(b []byte) (n int, err error) {
-	return rwc.writer.Write(b)
-}
-
-func (rwc *ReadWriteClose) Close() (errRet error) {
-	rwc.Lock()
-	if rwc.closed {
-		rwc.Unlock()
-		return
-	}
-	rwc.closed = true
-	closeFunc := rwc.closeFunc
-	rwc.Unlock()
-
-	var err error
-	if rc, ok := rwc.reader.(io.Closer); ok {
-		err = rc.Close()
-		if err != nil {
-			errRet = err
-		}
-	}
-
-	if wc, ok := rwc.writer.(io.Closer); ok {
-		err = wc.Close()
-		if err != nil {
-			errRet = err
-		}
-	}
-
-	if closeFunc != nil {
-		err = closeFunc()
-		if err != nil {
-			errRet = err
-		}
-	}
-	return
-}
-
-func (rwc *ReadWriteClose) SetCloseFunc(closeFunc func() (err error)) {
-	rwc.RLock()
-	defer rwc.RUnlock()
-	if !rwc.closed {
-		rwc.closeFunc = closeFunc
-	}
-	return
 }
 
 func DecodeOneMsg(reader io.Reader) (msg *message.Message, err error) {
@@ -122,52 +52,83 @@ func DecodeOneMsg(reader io.Reader) (msg *message.Message, err error) {
 		return
 	}
 	return
-
 }
 
-func Decode2MsgCh(rwc io.Reader) (msgCh chan *message.Message) {
+func Decode2MsgCh(reader io.Reader) (msgCh chan *message.Message) {
 	msgCh = make(chan *message.Message)
-	reader, ok := rwc.(*bufio.Reader)
-	switch ok {
-	// rwc.reader is *bufio.Reader
-	case true:
-		go func() {
-			var buf []byte
-			for {
-				header, err := reader.Peek(PackageHeadLen)
-				if err != nil {
-					if err == io.EOF || strings.Contains(err.Error(), "use of closed network connection") {
-						goto closeMsg
-					}
-					continue
-				}
-				n := tools.Bytes2Uint32(header)
-				packageLen := PackageHeadLen + n
-				if reader.Buffered() < packageLen {
-					goto closeMsg
-				}
-				buf = tools.GetBuf(packageLen)
-				_, err = reader.Read(buf)
-				if err != nil {
-					tools.PutBuf(buf)
-					goto closeMsg
-				}
-				msg, err := message.UnmarshalMessage(buf[PackageHeadLen:])
-				tools.PutBuf(buf)
-				if err != nil {
-					continue
-				}
-				msgCh <- msg
+	go func() {
+		defer close(msgCh)
+		for {
+			header := tools.GetBuf(PackageHeadLen)
+			n, err := io.ReadFull(reader, header)
+			if err != nil || n != len(header) {
+				tools.PutBuf(header)
+				return
 			}
-		closeMsg:
-			close(msgCh)
-		}()
-	case false:
-		// TODO: rwc.reader not is *bufio.Reader
-		close(msgCh)
-	}
+			dataLen := tools.Bytes2Uint32(header)
+			tools.PutBuf(header)
+			data := tools.GetBuf(dataLen)
+			n, err = io.ReadFull(reader, data)
+			if err != nil || n != len(data) {
+				tools.PutBuf(data)
+				return
+			}
+			msg, err := message.UnmarshalMessage(data)
+			tools.PutBuf(data)
+			if err != nil {
+				continue
+			}
+			msgCh <- msg
+		}
+	}()
 	return
 }
+
+// Deprecated
+// *Bufio.Reader cannot return io timeout(error).
+//func Decode2MsgCh2(rwc io.Reader) (msgCh chan *message.Message) {
+//	msgCh = make(chan *message.Message)
+//	reader, ok := rwc.(*bufio.Reader)
+//	switch ok {
+//	// rwc.reader is *bufio.Reader
+//	case true:
+//		go func() {
+//			var buf []byte
+//			for {
+//				header, err := reader.Peek(PackageHeadLen)
+//				if err != nil {
+//					if err == io.EOF || strings.Contains(err.Error(), "use of closed network connection") {
+//						goto closeMsg
+//					}
+//					continue
+//				}
+//				n := tools.Bytes2Uint32(header)
+//				packageLen := PackageHeadLen + n
+//				if reader.Buffered() < packageLen {
+//					goto closeMsg
+//				}
+//				buf = tools.GetBuf(packageLen)
+//				_, err = reader.Read(buf)
+//				if err != nil {
+//					tools.PutBuf(buf)
+//					goto closeMsg
+//				}
+//				msg, err := message.UnmarshalMessage(buf[PackageHeadLen:])
+//				tools.PutBuf(buf)
+//				if err != nil {
+//					continue
+//				}
+//				msgCh <- msg
+//			}
+//		closeMsg:
+//			close(msgCh)
+//		}()
+//	case false:
+//		// rwc.reader not is *bufio.Reader
+//		close(msgCh)
+//	}
+//	return
+//}
 
 func EncodeOneMsg(
 	uuid, connType, operation string,
@@ -203,41 +164,53 @@ func Forward(clienter1, clienter2 io.ReadWriteCloser) {
 }
 
 type Conn struct {
-	*ReadWriteClose
+	readTimeout time.Duration
 	net.Conn
+	closeFn func() (err error)
+	closed  bool
+	sync.RWMutex
 }
 
-func NewCoreConner(rwc *ReadWriteClose, conn net.Conn) (c *Conn) {
-	c = &Conn{
-		ReadWriteClose: rwc,
-		Conn:           conn,
+func WrapConner(conn net.Conn, readTimeout time.Duration, closeFn func() (err error)) (conner *Conn) {
+	conner = &Conn{
+		readTimeout: readTimeout,
+		Conn:        conn,
+		closeFn:     closeFn,
+		closed:      false,
 	}
 	return
 }
 
 func (c *Conn) Read(b []byte) (n int, err error) {
-	if c.ReadWriteClose == nil {
-		n, err = c.Conn.Read(b)
-	} else {
-		n, err = c.ReadWriteClose.Read(b)
+	if c.readTimeout > 0 {
+		err = c.SetReadDeadline(time.Now().Add(c.readTimeout))
+		if err != nil {
+			return
+		}
 	}
-	return
-}
-
-func (c *Conn) Write(b []byte) (n int, err error) {
-	if c.ReadWriteClose == nil {
-		n, err = c.Conn.Write(b)
-	} else {
-		n, err = c.ReadWriteClose.Write(b)
-	}
-	return
+	return c.Conn.Read(b)
 }
 
 func (c *Conn) Close() (err error) {
-	if c.ReadWriteClose == nil {
-		err = c.Conn.Close()
-	} else {
-		err = c.ReadWriteClose.Close()
+	c.Lock()
+	defer c.Unlock()
+	if c.closed {
+		return
 	}
+	if err = c.Conn.Close(); err != nil {
+		return
+	}
+	if c.closeFn != nil {
+		if err = c.closeFn(); err != nil {
+			return
+		}
+	}
+	c.closed = true
 	return
+}
+
+func (c *Conn) SetCloseFn(closeFn func() (err error)) {
+	c.Lock()
+	defer c.Unlock()
+	c.closeFn = closeFn
 }
