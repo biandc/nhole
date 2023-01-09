@@ -87,6 +87,10 @@ func (c *ControlClient) Run() {
 }
 
 func (c *ControlClient) register() {
+	conn := c.getConn()
+	if conn == nil {
+		return
+	}
 	var (
 		msgBytes []byte
 		msg      *message.Message
@@ -103,7 +107,7 @@ func (c *ControlClient) register() {
 	if err != nil {
 		return
 	}
-	_, err = c.Write(msgBytes)
+	_, err = conn.Write(msgBytes)
 	if err == nil || strings.Contains(err.Error(), "use of closed network connection") {
 		err = nil
 	}
@@ -163,6 +167,10 @@ func (c *ControlClient) handleCreateConn(msg *message.Message) {
 }
 
 func (c *ControlClient) createServer() {
+	conn := c.getConn()
+	if conn == nil {
+		return
+	}
 	for forwardPort := range c.services {
 		msgBytes, msg, err := core.EncodeOneMsg(
 			c.clientID,
@@ -176,7 +184,7 @@ func (c *ControlClient) createServer() {
 			c.logger.Error(err.Error())
 			continue
 		}
-		_, err = c.Write(msgBytes)
+		_, err = conn.Write(msgBytes)
 		if err != nil {
 			c.logger.Error(err.Error())
 		} else {
@@ -219,6 +227,10 @@ func (c *ControlClient) handleCreateServer(msg *message.Message) {
 }
 
 func (c *ControlClient) heartbeat() {
+	conn := c.getConn()
+	if conn == nil {
+		return
+	}
 	var (
 		msgBytes []byte
 		err      error
@@ -232,7 +244,7 @@ func (c *ControlClient) heartbeat() {
 	if err != nil {
 		return
 	}
-	_, err = c.Write(msgBytes)
+	_, err = conn.Write(msgBytes)
 	if err != nil {
 		return
 	}

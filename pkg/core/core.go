@@ -209,6 +209,10 @@ func (c *Conn) Close() (err error) {
 	return
 }
 
+func (c *Conn) SetReadTimeout(readTimeout time.Duration) {
+	c.readTimeout = readTimeout
+}
+
 func (c *Conn) SetCloseFn(closeFn func() (err error)) {
 	c.Lock()
 	defer c.Unlock()
