@@ -34,6 +34,8 @@ type ControlClient struct {
 
 	services map[int]ServiceInfo
 
+	clientRecord *clientRecord
+
 	sync.RWMutex
 }
 
@@ -61,6 +63,8 @@ func NewControlClienter(ctx context.Context, ip string, port int) (c *ControlCli
 		logger: log.FromContextSafe(newCtx),
 
 		services: services,
+
+		clientRecord: NewClientRecord(),
 	}
 	return
 }
@@ -158,6 +162,13 @@ func (c *ControlClient) handleCreateConn(msg *message.Message) {
 			)
 			if err != nil {
 				return
+			}
+			c.clientRecord.Add(clienter.clientID, clienter.controlConn)
+			if conner, ok := clienter.controlConn.(*core.Conn); ok {
+				conner.SetCloseFn(func() (err error) {
+					c.clientRecord.Del(clienter.clientID)
+					return
+				})
 			}
 			clienter.Run()
 		}
@@ -311,6 +322,7 @@ func (c *ControlClient) clear() {
 		c.msgCh = nil
 		c.Conn = nil
 		c.logger.ResetPrefixes()
+		c.clientRecord.Clear()
 	}
 }
 

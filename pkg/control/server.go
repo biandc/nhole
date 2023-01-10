@@ -2,10 +2,8 @@ package control
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/biandc/nhole/pkg/core"
@@ -14,101 +12,12 @@ import (
 	"github.com/biandc/nhole/pkg/tools"
 )
 
-type ClientRecord struct {
-	clientMap map[string]net.Conn
-	sync.RWMutex
-}
-
-func NewClientRecord() (c *ClientRecord) {
-	c = &ClientRecord{
-		clientMap: make(map[string]net.Conn, 0),
-	}
-	return
-}
-
-func (c *ClientRecord) Get(clientID string) (clienter net.Conn, err error) {
-	var ok bool
-	c.RLock()
-	defer c.RUnlock()
-	clienter, ok = c.clientMap[clientID]
-	if !ok {
-		err = fmt.Errorf("clientRecord not has %s", clientID)
-	}
-	return
-}
-
-func (c *ClientRecord) Add(clientID string, clienter net.Conn) {
-	c.Lock()
-	defer c.Unlock()
-	c.clientMap[clientID] = clienter
-}
-
-func (c *ClientRecord) Del(clientID string) {
-	c.Lock()
-	defer c.Unlock()
-	if _, ok := c.clientMap[clientID]; ok {
-		delete(c.clientMap, clientID)
-	}
-}
-
-type ControlRecord struct {
-	clientServer map[string][]string
-	serverMap    map[string]*ForwardServ
-	sync.RWMutex
-}
-
-func NewControlRecord() (c *ControlRecord) {
-	c = &ControlRecord{
-		clientServer: make(map[string][]string, 0),
-		serverMap:    make(map[string]*ForwardServ, 0),
-	}
-	return
-}
-
-func (c *ControlRecord) GetByServerID(serverID string) (server *ForwardServ, err error) {
-	var ok bool
-	c.RLock()
-	defer c.RUnlock()
-	server, ok = c.serverMap[serverID]
-	if !ok {
-		err = fmt.Errorf("serverID %s not find in ControlRecord", serverID)
-	}
-	return
-}
-
-func (c *ControlRecord) Add(clientID, serverID string, server *ForwardServ) {
-	c.Lock()
-	defer c.Unlock()
-	if c.clientServer == nil || c.serverMap == nil {
-		return
-	}
-	if _, ok := c.clientServer[clientID]; !ok {
-		c.clientServer[clientID] = make([]string, 0, 1)
-	}
-	c.clientServer[clientID] = append(c.clientServer[clientID], serverID)
-	c.serverMap[serverID] = server
-}
-
-func (c *ControlRecord) Del(clientID string) {
-	c.Lock()
-	defer c.Unlock()
-	if serverIDs, ok := c.clientServer[clientID]; ok {
-		for _, serverID := range serverIDs {
-			if server, ok := c.serverMap[serverID]; ok {
-				_ = server.Close()
-				delete(c.serverMap, serverID)
-			}
-		}
-		delete(c.clientServer, clientID)
-	}
-}
-
 type ControlServ struct {
 	ip   string
 	port int
 
-	controlRecord *ControlRecord
-	clientRecord  *ClientRecord
+	controlRecord *controlRecord
+	clientRecord  *clientRecord
 
 	net.Listener
 

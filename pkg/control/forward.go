@@ -181,6 +181,7 @@ func NewForwardClienter(
 	if err != nil {
 		return
 	}
+
 	f = &ForwardClient{
 		clientID:  "",
 		serverID:  serverID,
@@ -192,7 +193,7 @@ func NewForwardClienter(
 		controlPort: cPort,
 
 		localConn:   localConn,
-		controlConn: controlConn,
+		controlConn: core.WrapConner(controlConn, 0, nil),
 	}
 	err = f.register()
 	if err != nil {
