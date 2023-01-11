@@ -25,7 +25,6 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&client.LogWay, "log_way", "", "console", "log way.(console|file)")
 	rootCmd.PersistentFlags().StringVarP(&client.LogFile, "log_file", "", "", "log save file.")
 	rootCmd.PersistentFlags().StringVarP(&client.LogLevel, "log_level", "", "info", "log level.(error|warn|info|debug|trace)")
-	rootCmd.PersistentFlags().Int64VarP(&client.LogMaxdays, "log_maxdays", "", 0, "maximum number of days to save logs.")
 	rootCmd.PersistentFlags().BoolVarP(&client.LogDisableColor, "log_disable_color", "", false, "disable log color.")
 }
 

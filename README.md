@@ -12,7 +12,7 @@
 ▀                      
 ```
 
-nhole is an intranet penetration tool (agent).
+nhole is an intranet penetration tool.
 
 ## config
 
@@ -52,14 +52,14 @@ service:    // services
 ### server
 
 ```bash
-go run ./cmd/server/main.go
+# go run ./cmd/server/main.go
 ./nhole-server -c nhole-server.yaml
 ```
 
 ### client
 
 ```bash
-go run ./cmd/client/main.go
+# go run ./cmd/client/main.go
 ./nhole-client -c nhole-client.yaml
 ```
 
@@ -75,7 +75,6 @@ Flags:
       --log_disable_color   disable log color.
       --log_file string     log save file.
       --log_level string    log level.(error|warn|info|debug|trace) (default "info")
-      --log_maxdays int     maximum number of days to save logs.
       --log_way string      log way.(console|file) (default "console")
   -v, --version             nhole-server version.
 ```
@@ -90,7 +89,6 @@ Flags:
       --log_disable_color   disable log color.
       --log_file string     log save file.
       --log_level string    log level.(error|warn|info|debug|trace) (default "info")
-      --log_maxdays int     maximum number of days to save logs.
       --log_way string      log way.(console|file) (default "console")
   -v, --version             nhole-client version.
 ```

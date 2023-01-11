@@ -13,13 +13,12 @@ var (
 	LogWay          string
 	LogFile         string
 	LogLevel        string
-	LogMaxdays      int64
 	LogDisableColor bool
 )
 
 func Run(cfg *config.ServerCfg) (err error) {
 	tools.PrintLogo()
-	log.InitLog(LogWay, LogFile, LogLevel, LogMaxdays, LogDisableColor)
+	log.InitLog(LogWay, LogFile, LogLevel, LogDisableColor)
 
 	var (
 		server *control.ControlServ

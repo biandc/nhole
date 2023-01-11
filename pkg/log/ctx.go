@@ -4,10 +4,8 @@ import (
 	"context"
 )
 
-type key int
-
 const (
-	xlogKey key = 0
+	xlogKey = 0
 )
 
 func NewContext(ctx context.Context, xl *Logger) context.Context {

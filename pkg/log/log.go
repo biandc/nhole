@@ -14,17 +14,17 @@ func init() {
 	Log.SetLogFuncCallDepth(Log.GetLogFuncCallDepth() + 1)
 }
 
-func InitLog(logWay string, logFile string, logLevel string, maxdays int64, disableLogColor bool) {
-	SetLogFile(logWay, logFile, maxdays, disableLogColor)
+func InitLog(logWay string, logFile string, logLevel string, disableLogColor bool) {
+	SetLogFile(logWay, logFile, disableLogColor)
 	SetLogLevel(logLevel)
 }
 
-func SetLogFile(logWay string, logFile string, maxdays int64, disableLogColor bool) {
+func SetLogFile(logWay string, logFile string, disableLogColor bool) {
 	var params string
 	switch logWay {
 	case "file":
 		// file
-		params = fmt.Sprintf(`{"filename": "%s", "maxdays": %d}`, logFile, maxdays)
+		params = fmt.Sprintf(`{"filename": "%s"}`, logFile)
 		_ = Log.SetLogger("file", params)
 		return
 	case "console":
