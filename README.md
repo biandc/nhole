@@ -12,7 +12,7 @@
 ▀                      
 ```
 
-nhole is an intranet penetration tool.
+nhole is an intranet penetration tool (reverse proxy).
 
 ## config
 
